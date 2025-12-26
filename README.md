@@ -20,7 +20,7 @@ The scripts include:
 
 ### 3. Visualization Tools
 * **IGV Automation:** Custom scripts for generating Integrated Genomics Viewer (IGV) screenshots of fusion breakpoints.
-* 
+
 ### 4. Network Analysis
 * **MH63 Draft Assembly:** Computational workflows used for the draft MH63 assembly .
 * **Network Analysis:** Scripts for performing network-based analyses to identify modules and patterns within the fusion transcript landscape.
