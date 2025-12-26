@@ -1,0 +1,123 @@
+# identification of fusions using JAFFAL
+## MH63 genome sequence (Omh63.fa) and annotation (Omh63.gtf)
+gffread Omh63.gtf -g Omh63.fa -w Omh63_RS3.fasta
+gtfToGenePred Omh63.gtf Omh63.gpd -genePredExt
+awk '{print "1\t"$0}' Omh63.gpd | csvtk_tH add-header -n '#bin,name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,score,name2,cdsStartStat,cdsEndStat,exonFrames' > Omh63_RS3.tab
+cat Omh63_RS3.fasta | awk '{if(/^>/){print $1}else{print}}' | reformat fastawrap=0 in=stdin.fa out=stdout.fa > Omh63_RS3.fa
+less Omh63.gtf | grep -P "\texon\t" | awk '{print $1"\t"$4-1"\t"$5"\t"$10"\t.\t"$7}' | sortBed > Omh63_RS3.bed
+bedtools maskfasta -fi Omh63.fa -fo Masked_Omh63.fa -bed Omh63_RS3.bed 
+bowtie2-build Omh63_RS3.fa Omh63_RS3
+bowtie2-build Masked_Omh63.fa Masked_Omh63
+makeblastdb -in Omh63_RS3.fa -dbtype nucl -out Omh63_RS3_blast
+touch known_fusions.txt
+## test
+https://github.com/FusionSimulatorToolkit/FusionSimulatorToolkit/wiki
+~/softwares/fusion_transcripts/FusionSimulatorToolkit-master/FusionTranscriptSimulator Omh63.maker.gff Omh63.fa 100 > chims.fasta
+$JAFFAL_HOME/tools/bin/bpipe run -n 1 -p genome=Omh63 -p annotation=RS3 ~/softwares/fusion_transcripts/JAFFA-version-2.3/JAFFAL.groovy test.fasta
+## run
+$JAFFAL_HOME/tools/bin/bpipe run -n 10 -p refBase=/jaffal_db_mhrs3 -p genome=Omh63 -p annotation=RS3 -p outputName=jaffal_DRS ~/softwares/fusion_transcripts/JAFFA-version-2.3/JAFFAL.groovy *fasta
+
+
+# 可视化融合转录本
+cat mh63_drs.pc.visual.input | while read line; do sh create_fake_fusionTrans.refMH63RS3.sh $line mh63_drs.pc; done
+minimap2 -ax splice -uf -k14 mh63_drs.pc.visual.fa fusions_reads/mh63_drs.jaffal.fusions.correct.fa | samtools view -b | samtools sort > mh63_drs.jaffal.fusions.bam
+samtools index mh63_drs.jaffal.fusions.bam
+
+# breakpoints
+seqtk subseq Omh63.geneLocus.fa mh63_drs.pc.reads.geneID | fasta_formatter -w 80 > mh63_drs.pc.reads.gene.fa
+blastn -subject mh63_drs.pc.reads.fa -query mh63_drs.pc.reads.gene.fa -outfmt '6 qseqid qlen qstart qend sstrand sseqid slen sstart send nident length bitscore' -perc_identity 90 > mh63_drs.pc.reads.gene.blastn
+less mh63_drs.pc.reads.gene.blastn | awk '{if($5=="minus"){s=$9-1;e=$8}else{s=$8-1;e=$9}; print $6"\t"s"\t"e"\t"$1}'  | sortBed > mh63_drs.pc.reads.gene.bed
+mergeBed -d -30 -c 4 -o distinct -i mh63_drs.pc.reads.gene.bed > mh63_drs.pc.reads.gene.merged.bed
+perl get_breakpoints_on_read1.pl mh63_drs.pc jaffaD.csv > mh63_drs.pc.reads.breakpoints.bed
+samtools faidx mh63_drs.pc.reads.fa
+less mh63_drs.pc.reads.fa.fai | cut -f 1,2 > mh63_drs.pc.reads.fa.length
+genomeCoverageBed -i mh63_drs.pc.reads.gene.merged.bed -g mh63_drs.pc.reads.fa.length -bga > mh63_drs.pc.reads.gene.coverage
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | awk '$7==2{print $1"\t"$5"\t"$6"\t"$6-$5}' | awk '$4>3' > mh63_drs.pc.reads.out.shsGreat3.bed
+less mh63_drs.pc.reads.out.shsGreat3.bed | cut -f 1 > mh63_drs.pc.reads.out.shsGreat3.id
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | awk '$7==2{print $1"\t"$5"\t"$6"\t"$6-$5}' > mh63_drs.pc.reads.out.interBed
+less mh63_drs.pc.reads.out.interBed | awk '$4<=3' | sortBed > mh63_drs.pc.reads.out.join1.bed
+less mh63_drs.pc.reads.out.interBed | cut -f 1 > tmp.id
+less mh63_drs.pc.reads.gene.coverage | awk '$4==0' | sortBed> mh63_drs.pc.reads.out.coverage0
+less mh63_drs.pc.reads.gene.coverage | awk '$4==2' | sortBed> mh63_drs.pc.reads.out.coverage2
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | awk '$7<2' | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4=="."' | cut -f 1-3 > mh63_drs.pc.reads.out.join2.bed
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | awk '$7<2' | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4!="."' | awk '{print $1"\t"$2"\t"$3"\t"$6-$5"\t"$8}' | awk '$5>=30' | closestBed -a - -b mh63_drs.pc.reads.out.coverage2 -d | awk '{print $1"\t"$2"\t"$3"\t"$8-$7"\t"$10}' | awk '$4<=3 || $5>10' > mh63_drs.pc.reads.out.join3.bed
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | awk '$7<2' | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4!="."' | awk '{print $1"\t"$2"\t"$3"\t"$6-$5"\t"$8}' | awk '$5>=30' | closestBed -a - -b mh63_drs.pc.reads.out.coverage2 -d | awk '{print $1"\t"$7"\t"$8"\t"$8-$7"\t"$10}' | awk '$4>3 && $5<=10' > mh63_drs.pc.reads.out.shsGreat3_1.bed
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4!="."' | awk '{print $1"\t"$2"\t"$3"\t"$6-$5"\t"$8}' | awk '$5<30 && $4<30' | awk '$4==1 || $4==2' > mh63_drs.pc.reads.out.join4.bed
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4!="."' | awk '{print $1"\t"$2"\t"$3"\t"$6-$5"\t"$8}' | awk '$5<30 && $4<30' | awk '$4!=1 && $4!=2' > mh63_drs.pc.reads.out.unknown.bed
+intersectBed -a <( cut -f 1-3 mh63_drs.pc.reads.breakpoints.bed) -b mh63_drs.pc.reads.gene.coverage -wao | cut -f 1-3 | cs-th grep -f 1 -v -P tmp.id | sort | uniq | sortBed | closestBed -a - -b mh63_drs.pc.reads.out.coverage0 -d | awk '$4!="."' | awk '{print $1"\t"$2"\t"$3"\t"$6-$5"\t"$8}' | awk '$4>=30 && $5<30' > mh63_drs.pc.reads.out.error.bed
+
+
+# 3D interaction
+pairToPair -a ../$i.fusions.promoter.bedpe -b ../dna2dna_H3K4me3_rs3.bedpe -is > $i.dna2dna_H3K4me3.obversed
+sh random_gene_pair.sh ../../00data/long_reads_expression_salmon/drs.expressedGene.bed drs.fusions drs
+
+
+# MH63 draft assemble
+hifiasm -o MH63.asm -t 32 ../SRR10238608.fastq.gz
+
+
+# Arriba-based fusions
+STAR --runMode genomeGenerate --genomeDir ./ --genomeFastaFiles Omh63.genomic.fa --sjdbGTFfile Omh63.maker.gtf --runThreadN 4 --genomeSAindexNbases 13
+cat mh.list | while read pre; do pbssubmit -g $pre.star.log -j $pre -n 1 -p 5 -b high -l "STAR --runMode alignReads --runThreadN 5 --genomeDir ../01database/mh63classical/ --genomeLoad NoSharedMemory --readFilesIn /home/xtzhu/works/2024-05-09_DRS/data/RNAseq/${pre}_1_clean.fq.gz /home/xtzhu/works/2024-05-09_DRS/data/RNAseq/${pre}_2_clean.fq.gz --readFilesCommand zcat --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within --outFilterMultimapNmax 50 --peOverlapNbasesMin 10 --alignSplicedMateMapLminOverLmate 0.5 --alignSJstitchMismatchNmax 5 -1 5 5 --chimSegmentMin 10 --chimOutType WithinBAM HardClip --chimJunctionOverhangMin 10 --chimScoreDropMax 30 --chimScoreJunctionNonGTAG 0 --chimScoreSeparation 1 --chimSegmentReadGapMax 3 --chimMultimapNmax 50 --outFileNamePrefix $pre"; done
+cat mh.list | while read pre; do pbssubmit -g $pre.arriba.log -j $pre -n 1 -p 1 -b high -l "arriba -x ${pre}Aligned.sortedByCoord.out.bam -g ../01database/mh63classical/Omh63.maker.gtf -a ../01database/mh63classical/Omh63.genomic.fa -o $pre.arribaFusion.tsv -O $pre.arribaFusion.discarded -f blacklist -i Chr01,Chr02,Chr03,Chr04,Chr05,Chr06,Chr07,Chr08,Chr09,Chr10,Chr11,Chr12"; done
+for i in *tsv; do pre=$(echo $i | cut -f 1 -d '.'); perl reformat_tsv.pl $i | awk -v n=$pre '{print $0"\t"n}' > $pre.basic; done
+for i in ../02xingRNA_mhclassic/*.arriba; do pre=$(basename $i | cut -f 1 -d '.'); cat $i | perl filter_repeats.pl - > $pre.arriba; done
+cat flagleaf_HTLD.arriba flagleaf_HTSD.arriba flagleaf_LTLD.arriba flagleaf_LTSD.arriba | perl merge_flagleaf.pl - | cs-th sort -k 13:u -L 13:ranks > flagleaf.result.filter1_rep2
+
+
+# Annotation comparison
+agat_sp_statistics.pl --gff ../Omh63.can.gff3 -g ~/works/2023-07-22_OMAP/data/Genome_info/Omh63/Omh63.genomic.fa -o mh63.ststs
+agat_convert_sp_gff2bed.pl --gff ../Omh63.can.gff3 --sub exon -o Omh63.can.bed
+parseval -d -o parseval.out amel-aug-athal-param.gff3 amel-aug-dmel-param.gff3 &> parseval.log
+intersectBed -a <(awk '$3=="gene"' Omh63.can.gff3) -b <(awk '$3=="gene"' newOmh63.can.gff3) -wao -s| sed 's/ID=//g'| awk '$18!="."' | csvtk_tH fold -f 9 -v 18 -s ";" | awk '{n=sub(/;/,";",$2); split($2,a,";");if(n>=1){print $_"\t"length(a)}}' > v1_split_in_v2.id
+intersectBed -a <(awk '$3=="gene"' newOmh63.can.gff3) -b <(awk '$3=="gene"' Omh63.can.gff3) -wao -s| sed 's/ID=//g'| awk '$18!="."' | csvtk_tH fold -f 9 -v 18 -s ";" | awk '{n=sub(/;/,";",$2); split($2,a,";");if(n>=1){print $_"\t"length(a)}}' > v1_fuse_in_v2.id 
+perl resolve_parseval_out.newTranscripts.pl parseval.out | awk '$NF!=0'  > parseval.out.newTrans
+perl resolve_parseval_out.pl parseval.out > parseval.out.locusNum
+perl resolve_parseval_out.comparison.pl parseval.out > parseval.out.comparsion
+
+
+# Identification of fusions from hybrid rice
+phasing.py --pt=RNAseq --g1=../../01mapping_mh63/${pre}.fs.bam --g2=../../03mapping_zs97/${pre}.fs.bam --snp=../MH63vsZS97.snp --gop1=MH63 --gop2=ZS97 --st=5
+samtools merge -@ 10 -o ${pre}.mh.bam ../${pre}_R1/MH63_genome/MH63reads.bam ../${pre}_R2/MH63_genome/MH63reads.bam; samtools sort -@ 10 ${pre}.mh.bam > ${pre}.mh.sort.bam; samtools index $pre.mh.sort.bam
+samtools merge -@ 10 -o ${pre}.zs.bam ../${pre}_R1/MH63_genome/ZS97reads.bam ../${pre}_R2/MH63_genome/ZS97reads.bam; samtools sort -@ 10 ${pre}.zs.bam > ${pre}.zs.sort.bam; samtools index $pre.zs.sort.bam
+source activate deeptools; multiBamSummary bins -b *sort.bam -o rna.multiBamSummary -bs 100000 --outRawCounts rna.multiBamSummary.rawCounts --scalingFactors rna.multiBamSummary.scalingFactors -p 30
+source activate deeptools; bamCoverage -b $i -o ${pre}.bw -of bigwig --scaleFactor $scale -bs 1 -p 10
+
+samtools view -@ 4 -b -F 256 $pre.bam | samtools sort -@ 4 -n - > $pre.nameSorted.bam
+bamToBed -bedpe -ed -mate1 -i $pre.nameSorted.bam > $pre.nameSorted.bedpe
+samtools view $pre.nameSorted.bam | perl ../parse_bam_for_NM.pl - > $pre.nameSorted.stats
+
+csvtk -tH join <(cat MH63_leaf_R1.nameSorted.stats | cut -f 1,5,9) <(cat MH63_leaf_R1.nameSorted.stats | cut -f 1,5,9) -f '1;1' > MH63_leaf_R1.parentalAlign
+cat $pre.tagNM | perl nm_to_match.pl - > $pre.parentalAlig
+cat ../rna_seq_raw/sample.pre | while read pre; do echo $pre; cat $pre.parentalAlign | perl make_category.pl -; done 
+cat ../rna_seq_raw/sample.pre | while read pre; do cat $pre.parentalAlign | perl get_category.pl - > $pre.cistrans; done
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do cat ../${pre}_R1.cistrans ../${pre}_R2.cistrans > $pre.cistrans; done
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do cut -f 1 $pre.cistrans > $pre.readid; done 
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do perl ../get_bedpe.pl $pre.cistrans $pre.mh.bedpe > $pre.mh.bedpe.filter; done 
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do perl ../get_bedpe.pl $pre.cistrans $pre.zs.bedpe > $pre.zs.bedpe.filter; done
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do perl ../bed12Tobed6_mh.pl $pre.cistrans $pre.mh.bedpe.filter > $pre.mh.bedpe.filter.bed; done 
+cat ../../rna_seq_raw/sample.pre.norepeats | while read pre; do perl ../bed12Tobed6_zs.pl $pre.cistrans $pre.zs.bedpe.filter > $pre.zs.bedpe.filter.bed; done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
