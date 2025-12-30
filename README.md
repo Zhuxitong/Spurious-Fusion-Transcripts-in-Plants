@@ -13,17 +13,17 @@ The scripts include:
 ### 1. Plant Fusion Detection
 * **Modified JAFFAL:** A customized version of the [JAFFAL](https://github.com/Oshlack/JAFFA) software. Modifications were implemented to improve compatibility with complex plant genomes and non-standard gene annotations.
 * **Arriba-based Pipeline:** Commands for identifying fusion transcripts from short-read RNA-seq data using the Arriba framework.
-* **Hybrid-Specific Identification:** Specialized scripts for detecting and phasing fusion transcripts within hybrid rice.
+* **Hybrid-Specific Identification:** Specialized scripts for detecting fusion transcripts within hybrid rice.
 
 ### 2. Classification & Breakpoint Analysis
-* **Breakpoint Categorization:** Scripts for the systematic classification of fusion breakpoints based on genomic context.
+* **Breakpoint Categorization:** Scripts for the classification of fusion breakpoints based on genomic context.
 
 ### 3. Visualization Tools
-* **IGV Automation:** Custom scripts for generating Integrated Genomics Viewer (IGV) screenshots of fusion breakpoints.
+* **IGV:** Custom scripts for generating Integrated Genomics Viewer (IGV) screenshots of fusions and their breakpoints.
 
 ### 4. Network Analysis
-* **MH63 Draft Assembly:** Computational workflows used for the draft MH63 assembly .
-* **Network Analysis:** Scripts for performing network-based analyses to identify modules and patterns within the fusion transcript landscape.
+* **MH63 Draft Assembly:** Commands used for the draft MH63 assembly.
+* **Network Analysis:** Scripts for performing network-based analyses to identify modules and patterns within the false-positive fusions.
 
 ### 5. Statistics and Plotting
 * **Quantitative Analysis:** R scripts for statistical tests and data processing described in the manuscript.
@@ -37,7 +37,7 @@ Most scripts are written in **Perl**, **R**, and **Bash**.
 
 ## 📧 Contact
 
-For any questions, technical inquiries, or issues regarding the scripts and data analysis presented in this study, please feel free to reach out to the corresponding author:
+For any questions or issues regarding the scripts and data analysis presented in this study, please feel free to reach out to the author:
 
 * **Zhu Xitong**
 * **Email:** [z724@qq.com]
