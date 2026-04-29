@@ -5,10 +5,10 @@ This repository contains the computational workflows, scripts, test datasets, an
 
 Fusion transcripts were initially discovered in cancer and are increasingly reported across many organisms, including plants. However, whether most reported plant fusion transcripts represent genuine biological events or technical/analytical artifacts has remained unclear.
 In this study, we systematically re-evaluated fusion transcript detection in plants using multiple sequencing platforms, including:
-- **PacBio Iso-Seq**
+- **PacBio Iso-Seq (IsoSeq)**
 - **Nanopore direct RNA sequencing (dRNA-seq)**
-- **Nanopore PCR-cDNA sequencing**
-- **Short-read RNA-seq**
+- **Nanopore PCR-cDNA sequencing (cDNAseq)**
+- **Short-read RNA-seq (RNAseq)**
 
 Our results show that many reported plant fusion transcripts arise from previously underappreciated hidden sources, including:
 
@@ -17,7 +17,6 @@ Our results show that many reported plant fusion transcripts arise from previous
 - Genome assembly errors
 - Annotation inconsistencies
 - Reference-genome bias
-- Misclassification of adjacent genes
 
 This repository provides workflows to identify, classify, and visualize fusion transcripts in plants.
 
