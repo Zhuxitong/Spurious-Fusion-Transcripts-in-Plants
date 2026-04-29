@@ -86,21 +86,21 @@ echo "Step D1: Reformatting Arriba output files..."
 
 for i in *.tsv; do
 pre=$(echo $i | cut -f 1 -d '.')
-perl reformat_tsv.pl $i | \
+perl scripts/06_fusions_calling_short_reads/reformat_tsv.pl $i | \
 awk -v n=$pre '{print $0"\t"n}' > $pre.basic
 done
 
 
 echo "Step D2: Merging replicates..."
 
-cat *.basic | perl merge_rep.pl - > flagleaf.arriba
+cat *.basic | perl scripts/06_fusions_calling_short_reads/merge_rep.pl - > flagleaf.arriba
 
 
 echo "Step D3: Filtering repetitive candidates..."
 
 for i in *.arriba; do
 pre=$(basename $i | cut -f 1 -d '.')
-cat $i | perl filter_repeats.pl - > $pre.arriba
+cat $i | perl scripts/06_fusions_calling_short_reads/filter_repeats.pl - > $pre.arriba
 done
 
 
@@ -110,5 +110,5 @@ cat flagleaf_HTLD.arriba \
 flagleaf_HTSD.arriba \
 flagleaf_LTLD.arriba \
 flagleaf_LTSD.arriba | \
-perl merge_flagleaf.pl - | \
+perl scripts/06_fusions_calling_short_reads/merge_flagleaf.pl - | \
 csvtk -tH sort -k 13:u -L 13:ranks > flagleaf.result.filter1_rep
