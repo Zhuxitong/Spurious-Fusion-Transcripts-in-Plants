@@ -46,14 +46,14 @@ gffread Omh63.gtf -g Omh63.fa -w Omh63_RS3.fasta
 # Reformat transcript FASTA
 cat Omh63_RS3.fasta | \
 awk '{if(/^>/){print $1}else{print}}' | \
-~/PATH_to_JAFFAL/JAFFA-version-2.3/tools/bin/reformat \
+$JAFFAL_HOME/tools/bin/reformat \
 fastawrap=0 in=stdin.fa out=stdout.fa > Omh63_RS3.fa
 
 # GenePred table
 gtfToGenePred Omh63.gtf Omh63.gpd -genePredExt
 
 awk '{print "1\t"$0}' Omh63.gpd | \
-csvtk_tH add-header \
+csvtk -tH add-header \
 -n '#bin,name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,score,name2,cdsStartStat,cdsEndStat,exonFrames' \
 > Omh63_RS3.tab
 
@@ -96,7 +96,7 @@ $JAFFAL_HOME/tools/bin/bpipe run -n 1 \
 -p annotation=RS3 \
 -p outputName=test \
 -p refBase=~/PATH_to_JAFFAL_DB/JAFFAL_DB_MH63RS3 \
-~/PATH_to_JAFFAL_DB/JAFFA-version-2.3/JAFFAL.groovy \
+$JAFFAL_HOME/JAFFA_direct.groovy \
 test.fasta
 
 
@@ -111,7 +111,7 @@ $JAFFAL_HOME/tools/bin/bpipe run -n 10 \
 -p genome=Omh63 \
 -p annotation=RS3 \
 -p outputName=Isoseq \
-~/PATH_to_JAFFAL/JAFFA-version-2.3/JAFFAL.groovy \
+$JAFFAL_HOME/JAFFA_direct.groovy \
 Isoseq.fasta
 
 
@@ -122,11 +122,11 @@ Isoseq.fasta
 echo "Reformatting JAFFAL output..."
 
 sed '1d' Isoseq.csv | \
-perl scripts/reformat_jaffal.pl - | \
+perl scripts/02_fusion_calling/reformat_jaffal.pl - | \
 csvtk -tH sort -k 5:u -L 5:ranks > mh63_flagleaf.pc
 
 sed '1d' Isoseq.csv | \
-perl scripts/convert_jaffal_to_bedpe.pl - | \
+perl scripts/02_fusion_calling/convert_jaffal_to_bedpe.pl - | \
 sortBed -i - > mh63_flagleaf.pc.bedpe
 
 awk '{print $0"\t"$10"|"$1":"$2"|"$11}' \
