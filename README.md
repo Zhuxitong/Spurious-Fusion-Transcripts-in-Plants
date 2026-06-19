@@ -180,3 +180,8 @@ This repository is not only a fusion-calling workflow. It is also a framework fo
 > **When we detect a fusion transcript, how confident can we be that a genuine fusion event has actually occurred?**
 
 We hope this resource helps future studies avoid false positives and improve rigor in transcriptomics research.
+
+
+# License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
